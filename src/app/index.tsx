@@ -30,7 +30,7 @@ import type { RadniNalog } from '../services/nalozi';
 
 import { izracunajNaplatu } from '../services/nalozi';
 
-import { testirajUploadFotografije } from '../services/backend';
+import { proveriBackendKorisnika, testirajUploadFotografije } from '../services/backend';
 
 if (Platform.OS === 'web' && __DEV__) {
   (globalThis as any).testUploadFotografije =
@@ -316,6 +316,16 @@ export default function HomeScreen() {
 
   );
 
+  const testirajBackendNaTelefonu = async () => {
+    try {
+      await proveriBackendKorisnika();
+      Alert.alert('✅ Backend povezan!', 'Firebase autentifikacija je uspešna.');
+    } catch (error) {
+      const poruka = error instanceof Error ? error.message : 'Nepoznata greška.';
+      Alert.alert('❌ Backend greška', poruka);
+    }
+  };
+
   const odjaviSe = async () => {
 
     if (odjavljivanje) return;
@@ -575,6 +585,23 @@ export default function HomeScreen() {
         </View>
 
       </View>
+
+      {__DEV__ && Platform.OS !== 'web' && (
+        <Pressable
+          onPress={testirajBackendNaTelefonu}
+          style={{
+            backgroundColor: '#16A34A',
+            padding: 15,
+            borderRadius: 12,
+            marginBottom: 20,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>
+            🔐 Test backend konekcije
+          </Text>
+        </Pressable>
+      )}
 
       <View style={styles.greeting}>
 

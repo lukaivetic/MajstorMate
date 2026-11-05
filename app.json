@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "MajstorMate",
@@ -11,6 +12,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.lukaivetic.majstormate",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

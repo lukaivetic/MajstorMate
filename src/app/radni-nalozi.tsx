@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { doc, runTransaction } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
@@ -13,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { posaljiFotografijuNaloga } from '../services/backend';
 import { auth, db } from '../services/firebase';
 import {
   obrisiFirebaseNalog,
@@ -86,6 +88,7 @@ export default function RadniNalozi() {
   const [ucitavanje, setUcitavanje] = useState(true);
   const [greska, setGreska] = useState('');
   const [obrada, setObrada] = useState(false);
+  const [slanjeFotografije, setSlanjeFotografije] = useState(false);
   const [nalogZaUplatu, setNalogZaUplatu] = useState<string | null>(null);
   const [iznosNoveUplate, setIznosNoveUplate] = useState('');
   const [datumNoveUplate, setDatumNoveUplate] = useState(() => {
@@ -690,7 +693,79 @@ export default function RadniNalozi() {
       prikaziGresku('Nije uspelo otvaranje Google Maps navigacije.');
     }
   };
-  // Otvaranje naloga za izmenu
+  // Korak 63.91: izbor PRE/POSLE, galerija i slanje fotografije.
+  const izaberiFotografiju = (nalog: RadniNalog) => {
+    if (slanjeFotografije) return;
+
+    const odaberiIzGalerije = async (tip: 'pre' | 'posle') => {
+      try {
+        const rezultat = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 0.8,
+          selectionLimit: 1,
+        });
+
+        if (rezultat.canceled || !rezultat.assets?.length) return;
+
+        const fotografija = rezultat.assets[0];
+        const oznaka = tip === 'pre' ? 'PRE radova' : 'POSLE radova';
+        const potvrda = `Poslati fotografiju ${oznaka} za nalog: ${nalog.ime}?`;
+
+        const posalji = async () => {
+          try {
+            setSlanjeFotografije(true);
+            await posaljiFotografijuNaloga(
+              nalog.id,
+              tip,
+              fotografija.uri,
+              fotografija.mimeType ?? 'image/jpeg'
+            );
+            const poruka = `Fotografija ${oznaka} uspešno je sačuvana uz nalog za ${nalog.ime}.`;
+            if (Platform.OS === 'web') window.alert(poruka);
+            else Alert.alert('✅ Fotografija sačuvana!', poruka);
+          } catch (error) {
+            console.error('Slanje fotografije nije uspelo:', error);
+            prikaziGresku(
+              error instanceof Error ? error.message : 'Nije uspelo slanje fotografije.'
+            );
+          } finally {
+            setSlanjeFotografije(false);
+          }
+        };
+
+        if (Platform.OS === 'web') {
+          if (window.confirm(potvrda)) void posalji();
+        } else {
+          Alert.alert('Potvrdi slanje', potvrda, [
+            { text: 'Odustani', style: 'cancel' },
+            { text: 'Pošalji', onPress: () => void posalji() },
+          ]);
+        }
+      } catch (error) {
+        console.error('Greška pri izboru fotografije:', error);
+        prikaziGresku('Nije uspelo otvaranje galerije.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const izbor = window.prompt('Tip fotografije: unesi PRE ili POSLE');
+      if (!izbor) return;
+      const tip = izbor.trim().toLowerCase();
+      if (tip !== 'pre' && tip !== 'posle') {
+        prikaziGresku('Unesi PRE ili POSLE.');
+        return;
+      }
+      void odaberiIzGalerije(tip);
+    } else {
+      Alert.alert('📸 Fotografije PRE/POSLE', `Nalog: ${nalog.ime}\nIzaberi tip fotografije:`, [
+        { text: 'Otkaži', style: 'cancel' },
+        { text: 'PRE radova', onPress: () => void odaberiIzGalerije('pre') },
+        { text: 'POSLE radova', onPress: () => void odaberiIzGalerije('posle') },
+      ]);
+    }
+  };
+
   const izmeniNalog = (nalog: RadniNalog) => {
     router.push({
       pathname: '/novi-nalog',
@@ -1127,6 +1202,51 @@ export default function RadniNalozi() {
                 ))}
               </View>
               <View style={styles.actions}>
+                <Pressable
+                  style={{
+                    backgroundColor: '#DBEAFE',
+                    borderRadius: 9,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                  }}
+                  disabled={slanjeFotografije}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/fotografije',
+                      params: { nalogId: nalog.id },
+                    })
+                  }
+                >
+                  <Text
+                    style={{
+                      color: '#1D4ED8',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    📸 Fotografije PRE/POSLE
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={{
+                    backgroundColor: '#DCFCE7',
+                    borderRadius: 9,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                  }}
+                  disabled={slanjeFotografije}
+                  onPress={() => izaberiFotografiju(nalog)}
+                >
+                  <Text
+                    style={{
+                      color: '#15803D',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {slanjeFotografije ? '⏳ Slanje fotografije...' : '➕ Dodaj fotografiju'}
+                  </Text>
+                </Pressable>
                 <Pressable
                   style={styles.editButton}
                   onPress={() => izmeniNalog(nalog)}
